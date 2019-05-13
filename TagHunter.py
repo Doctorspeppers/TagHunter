@@ -11,22 +11,22 @@ from bs4 import BeautifulSoup
 import requests
 import json
 import datetime
-
+import pymysql
 """
 TAG HUNTER
 @params str url
 @params str sitename
-@param list tagContent[str(tag), dict(features)]
-@params list findparams [[str(tag), dict(features), (optional)str(parameter to get the content)], [str(tag), dict(features), (optional)str(parameter to get the content)], [str(tag), dict(features), (optional)str(parameter to get the content)]]
+@params list tagContent[[str(tag), dict(features), (optional)str(parameter to get the content)], [str(tag), dict(features), (optional)str(parameter to get the content)], [str(tag), dict(features), (optional)str(parameter to get the content)]]
 """
 
 class TagHunter:
   
-  def __init__(self, url, sitename, tagContent, maxdeep=None):
+  def __init__(self, url, sitename, tagContent):
     self.sitename = sitename
     self.url = []
     self.urlInicial = url
     self.forUrls = []
+    
     self.tagContent = tagContent
     self.url.append(url)
     self.pages = []
@@ -36,109 +36,184 @@ class TagHunter:
     self.confirmPage = True
     self.confirmAnalyze = True
     self.confirmUrls = True
-    self.deep = []
-    self.maxdeep = maxdeep
 
   def main(self):
     while self.confirmPage == True or self.confirmAnalyze == True:
-      if self.maxdeep == None:
-        self.confirmPage = self.GetPages()
-        self.confirmAnalyze = self.Analyze()
-        pass
-      elif self.maxdeep > len(self.deep):
-        self.confirmPage = self.GetPages()
-        self.confirmAnalyze = self.Analyze()
-        pass
-      elif self.maxdeep <= len(self.deep):
-        break
-    self.confirmAnalyze = self.Analyze()
+      self.confirmPage = self.GetPages()
+      
+      self.confirmAnalyze = self.Analyze()
+      
+    self.confirmClean = self.CleanContent()
     
   def Analyze(self):
     try:
       if len(self.pages) != 0:
         pageForAnalyze = self.pages.pop()
+        
       else:
         return False 
-      result = []
-      html = pageForAnalyze[1]
-      tagResult = []
-      for z in self.tagContent:
-        if len(z) >= 2:
-          tempResult = html.find_all(z[0])
-          for x in tempResult:
-            for key,val in z[1].items():
-              if val in x.get(key):
-                result.append(x)
-        elif len(z) == 1:
-          result = html.find_all(z[0])
-          for y in result:
-            result.append(y)
-        for x in result:
-          if len(z) == 3:
-            if z[3] == 'text':
-              tagResult = x.get_text()
-            else:
-              for x in result:
-                tagResult = x.get(z[3])
-        if len(z) == 3: 
-          arrayResult= [pageForAnalyze[0], tagResult]
-        else:
-          arrayResult= [pageForAnalyze[0], result]
-      self.content.append(arrayResult)
+      
+      page = pageForAnalyze[1]
+      tempContent = []
+   
+      for z in self.tagContent:  
+        result = page.find_all(z[0])
+        
+        for y in result:
+          tempContent.append(y)
+      
+      result= [pageForAnalyze[0], tempContent]
+      self.dirtyContent.append(result)
     except KeyError:
       return False
+      
     else:
       return True
       
+  def CleanContent(self):
+    while True:
+     
+      try:
+        
+        for x in self.tagContent:
+          
+          for key,val in x[1].items():
+            tempContent = []
+            result = []
+            
+            for y in self.dirtyContent:
+              
+              for z in y[1]:
+                
+                if z.get(key) != None:
+                  if val in z.get(key):      
+                    tempContent.append(z)
+                
+              temploc = [y[0], tempContent]
+              if temploc not in result:
+                result.append(temploc)
+              
+          if len(x) == 3:  
+            for x in len(0, result):
+              for z in range(0, len(result[x][1])):
+                result[x][1].append(result[x][1][z].get(x[2]))
+          
+        self.content.append(result)
+
+        return True
+      except KeyError:
+        return False
+      
+      else:
+        pass
+    
+    return True
   
-  
+  def remove_duplicates(self, list1, list2):
+    l = []
+    for i in list1:
+        if i not in list2:
+            l.append(i)
+    l.sort()
+    return l
+
   def GetPages(self):
     try:
       tempUrl = []
       tempPages = []
-      thisLayer = 0
       self.n1Url = len(self.url)
       for _ in range(0, self.n1Url):
         try:
           self.nUrl = len(self.url)
-          for __ in range(0, self.nUrl):
+          for _ in range(0, self.nUrl):
             try:
+              
               tempUrl = self.url.pop()
+            
             except KeyError:
-              break
+              return False
+            
             else:
+              
               tempPages = []
               if tempUrl not in self.urls_ja_escaneadas:
-                
-                self.urls_ja_escaneadas.append(tempUrl)
-                resposta = requests.get(tempUrl)
-                if resposta.status_code == 200:
-                  thisLayer += 1
-                  try:
-                    tempPages.append(tempUrl)
+                  self.urls_ja_escaneadas.append(tempUrl)
+                  resposta = requests.get(tempUrl)
+                  print(len(self.url))
+                  if resposta.status_code == 200:
                     try:
-                      tempPages.append(BeautifulSoup(resposta.content, "html.parser"))
-                    except TypeError:
-                      pass
-                    else:
-                      self.pages.append(tempPages)   
-                      bs = BeautifulSoup(resposta.content, "html.parser")
-                      for link in bs.find_all('a'):
-                        if link["href"].startswith(self.urlInicial):
-                          self.url.append(link["href"])
-                        elif link["href"].startswith("/") and tempUrl+link["href"] != tempUrl+"/":
-                          self.url.append(tempUrl + link["href"])
-                        elif link["href"].startswith(tempUrl) and tempUrl+link["href"] != tempUrl+"/":
-                          self.url.append(link["href"])
-                  except KeyError:
-                    pass
+                      tempPages.append(tempUrl)
+                      try:
+                        tempPages.append(BeautifulSoup(resposta.content, "html.parser"))
+                      
+                      except TypeError:
+                        pass
+                      else:
+                        self.pages.append(tempPages)
+                        self.url = list(set(self.url))
+                        bs = BeautifulSoup(resposta.content, "html.parser")
+                        links = bs.find_all('a')
+                        links = list(set(links))
+                        
+                        for link in links:
+                          
+                          if link["href"].startswith(self.urlInicial) and link["href"] not in self.urls_ja_escaneadas and link["href"] not in self.urls_ja_escaneadas and ".html" not in tempUrl and ".php" not in tempUrl:
+                            self.url.append(link["href"])
+                          
+                          elif link["href"].startswith("/") and tempUrl+link["href"] != tempUrl+"/" and tempUrl+link["href"] not in self.urls_ja_escaneadas and link["href"] not in self.urls_ja_escaneadas and ".html" not in tempUrl and ".php" not in tempUrl:
+                            self.url.append(tempUrl + link["href"])
+                           
+                          elif link["href"].startswith(tempUrl) and tempUrl+link["href"] != tempUrl+"/" and link["href"] not in self.urls_ja_escaneadas and link["href"] not in self.urls_ja_escaneadas and ".html" not in tempUrl and ".php" not in tempUrl:
+                            self.url.append(link["href"])
+                          elif ".html" in link["href"] or ".php" in link["href"] and link["href"] not in self.urls_ja_escaneadas and ".html" not in tempUrl and ".php" not in tempUrl:
+                            self.url.append(tempUrl+link["href"])
+                        return True
 
+                    except KeyError:
+                      pass
+          
         except KeyError:
           pass
-      self.deep.append(thisLayer)
+    
     except KeyError:
       return False    
     
+
+  def tosql(self,host,user,password,database,query,data):
+    try:
+      connection = pymysql.connect(user=user, password=password,
+                                host=host,
+                                db=database,
+                              cursorclass=pymysql.cursors.DictCursor)
+    except Exception:
+      return False
+    else:  
+      with connection.cursor() as cursor:
+        if(type(data) == "array"):
+          for x in data:
+            cursor.execute(query,x)
+            cursor.commit()
+            cursor.close()
+        else:
+          cursor.execute(query,data)
+          cursor.commit()
+          
+    finally:
+      cursor.close()
   def tostring(self):
     for x in range(0, len(self.content)):
       self.content.insert(x, str(self.content[x]))
+
+  def export(self, fileName=None):
+    if fileName != None:
+      with open(self.sitename+".json", 'a') as outfile:
+        json.dump(json.dumps(self.content), outfile)
+    
+    else:
+      with open(fileName+".json", 'a') as outfile:
+        json.dump(json.dumps(self.content), outfile)
+      
+
+teste = TagHunter("https://araquari.ifc.edu.br/","araquari.ifc",[["div", {"class":"page-subheader"}]])
+teste.main()
+print(teste.content)
