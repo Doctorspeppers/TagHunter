@@ -204,7 +204,7 @@ class TagHunter:
     for x in range(0, len(self.content)):
       self.content.insert(x, str(self.content[x]))
 
-  def export(self, fileName=None, exporttype="json):
+  def export(self, fileName=None, exporttype="json"):
     if fileName != None:
       with open(self.sitename+"."+exporttype, 'a') as outfile:
         json.dump(json.dumps(self.content), outfile)
