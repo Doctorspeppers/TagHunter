@@ -12,6 +12,8 @@ import requests
 import json
 import datetime
 import pymysql
+import threading
+import random
 """
 TAG HUNTER
 @params str url
@@ -36,13 +38,22 @@ class TagHunter:
     self.confirmPage = True
     self.confirmAnalyze = True
     self.confirmUrls = True
+    self.main()
 
   def main(self):
     while self.confirmPage == True or self.confirmAnalyze == True:
-      self.confirmPage = self.GetPages()
       
-      self.confirmAnalyze = self.Analyze()
+      t1 = threading.Thread(target=self.GetPages)
+      t2 = threading.Thread(target=self.GetPages)
+      t3 = threading.Thread(target=self.Analyze)
+      t1.start()
+      t2.start()
+      t3.start()
+      print(len(self.url))
+      t1.join()
+      t2.join()
       
+    t3.join()
     self.confirmClean = self.CleanContent()
     
   def Analyze(self):
@@ -80,7 +91,6 @@ class TagHunter:
           for key,val in x[1].items():
             tempContent = []
             result = []
-            
             for y in self.dirtyContent:
               
               for z in y[1]:
@@ -108,112 +118,50 @@ class TagHunter:
         pass
     
     return True
-  
-  def remove_duplicates(self, list1, list2):
-    l = []
-    for i in list1:
-        if i not in list2:
-            l.append(i)
-    l.sort()
-    return l
 
   def GetPages(self):
     try:
       tempUrl = []
       tempPages = []
-      self.n1Url = len(self.url)
-      for _ in range(0, self.n1Url):
-        try:
-          self.nUrl = len(self.url)
-          for _ in range(0, self.nUrl):
-            try:
-              
-              tempUrl = self.url.pop()
-            
-            except KeyError:
-              return False
-            
-            else:
-              
-              tempPages = []
-              if tempUrl not in self.urls_ja_escaneadas:
-                  self.urls_ja_escaneadas.append(tempUrl)
-                  resposta = requests.get(tempUrl)
-                  print(len(self.url))
-                  if resposta.status_code == 200:
-                    try:
-                      tempPages.append(tempUrl)
-                      try:
-                        tempPages.append(BeautifulSoup(resposta.content, "html.parser"))
-                      
-                      except TypeError:
-                        pass
-                      else:
-                        self.pages.append(tempPages)
-                        self.url = list(set(self.url))
-                        bs = BeautifulSoup(resposta.content, "html.parser")
-                        links = bs.find_all('a')
-                        links = list(set(links))
-                        
-                        for link in links:
-                          
-                          if link["href"].startswith(self.urlInicial) and link["href"] not in self.urls_ja_escaneadas and link["href"] not in self.urls_ja_escaneadas and ".html" not in tempUrl and ".php" not in tempUrl:
-                            self.url.append(link["href"])
-                          
-                          elif link["href"].startswith("/") and tempUrl+link["href"] != tempUrl+"/" and tempUrl+link["href"] not in self.urls_ja_escaneadas and link["href"] not in self.urls_ja_escaneadas and ".html" not in tempUrl and ".php" not in tempUrl:
-                            self.url.append(tempUrl + link["href"])
-                           
-                          elif link["href"].startswith(tempUrl) and tempUrl+link["href"] != tempUrl+"/" and link["href"] not in self.urls_ja_escaneadas and link["href"] not in self.urls_ja_escaneadas and ".html" not in tempUrl and ".php" not in tempUrl:
-                            self.url.append(link["href"])
-                          elif ".html" in link["href"] or ".php" in link["href"] and link["href"] not in self.urls_ja_escaneadas and ".html" not in tempUrl and ".php" not in tempUrl:
-                            self.url.append(tempUrl+link["href"])
-                        return True
-
-                    except KeyError:
-                      pass
-          
-        except KeyError:
-          pass
-    
-    except KeyError:
-      return False    
-    
-
-  def tosql(self,host,user,password,database,query,data):
-    try:
-      connection = pymysql.connect(user=user, password=password,
-                                host=host,
-                                db=database,
-                              cursorclass=pymysql.cursors.DictCursor)
-    except Exception:
-      return False
-    else:  
-      with connection.cursor() as cursor:
-        if(type(data) == "array"):
-          for x in data:
-            cursor.execute(query,x)
-            cursor.commit()
-            cursor.close()
+      nUrl = len(self.url)
+      if nUrl != 0:
+        if nUrl != 1:
+          tempUrl = self.url.pop(random.randrange(0, nUrl))
         else:
-          cursor.execute(query,data)
-          cursor.commit()
+          tempUrl = self.url.pop()
+      else:
+        self.confirmPage =  False
+      tempPages = []
+      if tempUrl not in self.urls_ja_escaneadas:
+          self.urls_ja_escaneadas.append(tempUrl)
+          resposta = requests.get(tempUrl)
           
-    finally:
-      cursor.close()
-  def tostring(self):
-    for x in range(0, len(self.content)):
-      self.content.insert(x, str(self.content[x]))
+          if resposta.status_code == 200:
+            tempPages.append(tempUrl)
+            tempPages.append(BeautifulSoup(resposta.content, "html.parser"))
+          
+            self.pages.append(tempPages)
+            self.url = list(set(self.url))
+            bs = BeautifulSoup(resposta.content, "html.parser")
+            links = bs.find_all('a')
+            links = list(set(links))     
+            for link in links:
+              
+              if link["href"].startswith(self.urlInicial) and link["href"] not in self.urls_ja_escaneadas and link["href"] not in self.urls_ja_escaneadas and ".html" not in tempUrl and ".php" not in tempUrl:
+                self.url.append(link["href"])
+              
+              elif link["href"].startswith("/") and tempUrl+link["href"] != tempUrl+"/" and tempUrl+link["href"] not in self.urls_ja_escaneadas and link["href"] not in self.urls_ja_escaneadas and ".html" not in tempUrl and ".php" not in tempUrl:
+                self.url.append(tempUrl + link["href"])
+                
+              elif link["href"].startswith(tempUrl) and tempUrl+link["href"] != tempUrl+"/" and link["href"] not in self.urls_ja_escaneadas and link["href"] not in self.urls_ja_escaneadas and ".html" not in tempUrl and ".php" not in tempUrl:
+                self.url.append(link["href"])
+            self.confirmPage = True
+    except KeyError:
+      self.confirmPage = False    
 
-  def export(self, fileName=None, exporttype="json"):
-    if fileName != None:
-      with open(self.sitename+"."+exporttype, 'a') as outfile:
-        json.dump(json.dumps(self.content), outfile)
-    
-    else:
-      with open(fileName+"."+exporttype, 'a') as outfile:
-        json.dump(json.dumps(self.content), outfile)
-      
 
-teste = TagHunter("https://araquari.ifc.edu.br/","araquari.ifc",[["div", {"class":"page-subheader"}]])
-teste.main()
-print(teste.content)
+queue = [["https://araquari.ifc.edu.br/","araquari.ifc",[["div", {"class":"page-subheader"}]]], ["https://ctf-br.org","ctf-br.org",[["h1",{"h1":"page-introduce-title"}]]]]    
+
+
+print(TagHunter("https://araquari.ifc.edu.br/","araquari.ifc",[["div", {"class":"page-subheader"}]]).content)
+
